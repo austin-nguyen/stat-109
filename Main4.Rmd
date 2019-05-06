@@ -1,0 +1,772 @@
+---
+title: "Stat 109 Final Project"
+author: "Joanna Guo/Austin Nguyen/Jeremiah Rodriguez/Tiffany Huang"
+date: "5/4/2019"
+output: pdf_document
+---
+
+### Create Functions
+```{r}
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+subset_colclasses <- function(DF, colclasses="numeric") {
+  DF[,sapply(DF, function(vec, test) class(vec) %in% test, test=colclasses)]
+}
+
+```
+
+### Source libraries and Read in data
+```{r}
+packages <- c("ggplot2", "tidyverse", "dplyr","lubridate","knitr","magrittr","moderndive","sqldf","readr","lubridate","car","fastDummies")
+ipak(packages)
+
+## Read in Data
+## need to install tidyverse in order to get data that is saved as .csv.gz
+## tidyverse also has a number of other packages for data wrangling
+
+# Load Data
+listings_data = read_csv("http://data.insideairbnb.com/united-states/ma/boston/2019-02-09/data/listings.csv.gz")
+#calendar_data = read_csv("http://data.insideairbnb.com/united-states/ma/boston/2019-02-09/data/calendar.csv.gz")
+#reviews_data = read_csv("http://data.insideairbnb.com/united-states/ma/boston/2019-02-09/data/reviews.csv.gz")
+#glimpse(listings_data)
+
+```
+
+## Below is Original Set of variables, plus some original variables in the dataset
+```{r}
+#loads libraries
+library(readr) #to recode columns from factors to numeric
+library(dplyr)
+library(lubridate) #needed to handle dates easily 
+library(car) #needed to recode values easily
+
+#loads dataset
+cal_detail <- read.csv("calendar_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
+list_detail <- read.csv("listings_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
+
+#renames id to listing_id so there is a unique_key on which datasets can be merged
+#  names(list_detail)[names(list_detail) == "id"] <- "listing_id"
+list_detail = listings_data
+names(list_detail)[names(list_detail) == "id"] <- "listing_id"
+
+#defines variables of interest out of total
+myvars <- c("listing_id",
+            "host_since",
+            "host_location",
+            "host_response_time",
+            "host_response_rate",
+            "host_acceptance_rate",
+            "host_is_superhost",
+            "host_neighbourhood",
+            "host_listings_count",
+            "host_total_listings_count",
+            "host_verifications",
+            "host_has_profile_pic",
+            "host_identity_verified",
+            "neighbourhood_cleansed",
+            "property_type",
+            "room_type",
+            "accommodates",
+            "bathrooms",
+            "bedrooms",
+            "beds",
+            "bed_type",
+            "square_feet",
+            "price",
+            "weekly_price",
+            "monthly_price",
+            "security_deposit",
+            "cleaning_fee",
+            "guests_included",
+            "extra_people",
+            "minimum_nights",
+            "maximum_nights",
+            "minimum_minimum_nights",
+            "maximum_minimum_nights",
+            "minimum_maximum_nights",
+            "maximum_maximum_nights",
+            "minimum_nights_avg_ntm",
+            "maximum_nights_avg_ntm",
+            "calendar_updated",
+            "has_availability",
+            "availability_30",
+            "availability_60",
+            "availability_90",
+            "availability_365",
+            "calendar_last_scraped",
+            "number_of_reviews",
+            "number_of_reviews_ltm",
+            "first_review",
+            "last_review",
+            "review_scores_rating",
+            "review_scores_accuracy",
+            "review_scores_cleanliness",
+            "review_scores_checkin",
+            "review_scores_communication",
+            "review_scores_location",
+            "review_scores_value",
+            "requires_license","license",
+            "jurisdiction_names",
+            "instant_bookable",
+            "is_business_travel_ready",
+            "cancellation_policy",
+            "require_guest_profile_picture",
+            "require_guest_phone_verification",
+            "calculated_host_listings_count",
+            "calculated_host_listings_count_entire_homes",
+            "calculated_host_listings_count_private_rooms",
+            "calculated_host_listings_count_shared_rooms",
+            "reviews_per_month"
+            ## for character counts later 
+            ,"name" , 
+            "summary" , 
+            "space" , 
+            "description" , 
+            "experiences_offered" , 
+            "neighborhood_overview" , 
+            "notes" , 
+            "transit" , 
+            "access", 
+            "interaction" , 
+            "house_rules"
+            )
+
+#applies filters to th Airbnb listing dataset
+list_filtered <- list_detail[myvars]
+
+```
+
+
+### removes spaces in certain variables 
+```{r}
+#removes spaces in certain variables 
+list_filtered$neighbourhood_cleansed <- gsub(" ", "_", list_filtered$neighbourhood_cleansed)
+list_filtered$host_response_time <- gsub(" ", "_", list_filtered$host_response_time)
+#list_filtered$host_response_time <- gsub("/", "_", list_filtered$host_response_time)
+list_filtered$bed_type <- gsub(" ", "_", list_filtered$bed_type)
+#list_filtered$bed_type <- gsub("-", "_", list_filtered$bed_type)
+list_filtered$property_type <- gsub(" ", "_", list_filtered$property_type)
+list_filtered$property_type <- gsub("/", "_", list_filtered$property_type)
+list_filtered$room_type <- gsub(" ", "_", list_filtered$room_type)
+#list_filtered$room_type <- gsub("/", "_", list_filtered$room_type)
+
+list_filtered$name <- gsub(" ", "_", list_filtered$name)
+list_filtered$name <- gsub("/", "_", list_filtered$name)
+
+list_filtered$summary <- gsub(" ", "_", list_filtered$summary)
+list_filtered$summary <- gsub("/", "_", list_filtered$summary)
+
+list_filtered$space <- gsub(" ", "_", list_filtered$space)
+list_filtered$space <- gsub("/", "_", list_filtered$space)
+
+list_filtered$description <- gsub(" ", "_", list_filtered$description)
+list_filtered$description <- gsub("/", "_", list_filtered$description)
+
+list_filtered$experiences_offered <- gsub(" ", "_", list_filtered$experiences_offered)
+list_filtered$experiences_offered <- gsub("/", "_", list_filtered$experiences_offered)
+
+list_filtered$neighborhood_overview <- gsub(" ", "_", list_filtered$neighborhood_overview)
+list_filtered$neighborhood_overview <- gsub("/", "_", list_filtered$neighborhood_overview)
+
+list_filtered$notes <- gsub(" ", "_", list_filtered$notes)
+list_filtered$notes <- gsub("/", "_", list_filtered$notes)
+
+list_filtered$transit <- gsub(" ", "_", list_filtered$transit)
+list_filtered$transit <- gsub("/", "_", list_filtered$transit)
+
+list_filtered$access <- gsub(" ", "_", list_filtered$access)
+list_filtered$access <- gsub("/", "_", list_filtered$access)
+
+list_filtered$interaction <- gsub(" ", "_", list_filtered$interaction)
+list_filtered$interaction <- gsub("/", "_", list_filtered$interaction)
+
+list_filtered$house_rules <- gsub(" ", "_", list_filtered$house_rules)
+list_filtered$house_rules <- gsub("/", "_", list_filtered$house_rules)
+
+```
+
+### recodes 'N/A' to NAs
+```{r}
+#recodes 'N/A' to NAs
+list_filtered$host_response_rate[list_filtered$host_response_rate=="N/A"] <- NA
+list_filtered$host_response_time[list_filtered$host_response_time=="N/A"] <- NA
+list_filtered$host_acceptance_rate[list_filtered$host_acceptance_rate=="N/A"] <- NA ### all of these values are NA
+```
+
+### converts price variables from factors into ints
+```{r}
+list_filtered$price <- parse_number(list_filtered$price)
+list_filtered$weekly_price <- parse_number(list_filtered$weekly_price)
+list_filtered$monthly_price <- parse_number(list_filtered$monthly_price)
+list_filtered$security_deposit <- parse_number(list_filtered$security_deposit)
+list_filtered$cleaning_fee <- parse_number(list_filtered$cleaning_fee)
+list_filtered$extra_people <- parse_number(list_filtered$extra_people)
+list_filtered$host_response_rate <- parse_number(list_filtered$host_response_rate)
+```
+
+### recodes variables: host_verifcations 1/0
+```{r}
+##recodes variables as 1/0
+#host_verification
+list_filtered$host_verification_email <- ifelse(grepl("email", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_identity_manual <- ifelse(grepl("identity_manual", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_phone<- ifelse(grepl("phone", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_reviews<- ifelse(grepl("reviews", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_jumio<- ifelse(grepl("jumio", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_government_id<- ifelse(grepl("government_id", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_work_email<- ifelse(grepl("work_email", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_selfie<- ifelse(grepl("selfie", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_facebook<- ifelse(grepl("facebook", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_google<- ifelse(grepl("google", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_kba<- ifelse(grepl("kba", list_filtered$host_verifications, ignore.case = T), 1,0)
+list_filtered$host_verification_weibo<- ifelse(grepl("weibo", list_filtered$host_verifications, ignore.case = T), 1,0)
+```
+
+### other features: recode to 1/0
+```{r}
+#other features: recode to 1/0
+list_filtered$host_is_superhost<- ifelse(grepl("t", list_filtered$host_is_superhost, ignore.case = T), 1,0)
+list_filtered$host_has_profile_pic<- ifelse(grepl("t", list_filtered$host_has_profile_pic, ignore.case = T), 1,0)
+list_filtered$host_identity_verified<- ifelse(grepl("t", list_filtered$host_identity_verified, ignore.case = T), 1,0)
+list_filtered$has_availability<- ifelse(grepl("t", list_filtered$has_availability, ignore.case = T), 1,0)
+list_filtered$requires_license<- ifelse(grepl("t", list_filtered$requires_license, ignore.case = T), 1,0)
+list_filtered$require_guest_profile_picture<- ifelse(grepl("t", list_filtered$require_guest_profile_picture, ignore.case = T), 1,0)
+list_filtered$instant_bookable<- ifelse(grepl("t", list_filtered$instant_bookable, ignore.case = T), 1,0)
+list_filtered$is_business_travel_ready<- ifelse(grepl("t", list_filtered$is_business_travel_ready, ignore.case = T), 1,0)
+list_filtered$require_guest_phone_verification<- ifelse(grepl("t", list_filtered$require_guest_phone_verification, ignore.case = T), 1,0)
+```
+
+
+### converts dates to workable format
+```{r}
+#converts dates to workable format
+list_filtered$calendar_last_scraped <- ymd(list_filtered$calendar_last_scraped)
+list_filtered$first_review <- ymd(list_filtered$first_review)
+list_filtered$last_review <- ymd(list_filtered$last_review)
+list_filtered$host_since <- ymd(list_filtered$host_since)
+
+#feature generation: calculates "life" of listing based on first review and last review
+### This step introduced NAs by coercion 
+td<- seconds_to_period(as.duration(interval(list_filtered$first_review,list_filtered$last_review))) 
+list_filtered$listing_lifetime_proxy<-as.numeric(sprintf('%02d', day(td)))
+```
+
+
+## Check Data=
+```{r}
+glimpse(list_filtered)
+summary(list_filtered)
+```
+
+### Recode the calendar_updated columne
+
+```{r}
+
+## My Data set is still called list_filtered
+## First find the unique values of calendar_updated
+unique(list_filtered$calendar_updated) ## there is a never column 
+
+list_filtered %>%
+  group_by(calendar_updated) %>%
+  summarise(listings = n_distinct(listing_id))
+## 4 have a never, do those listings have availability?
+
+list_filtered %>%
+  filter(calendar_updated == "never") %>% head()
+## all of these hosts have been hosts since 2015, but only 1 had availability; going to remove these 4 rows.
+
+list_filtered <- list_filtered %>%
+  filter(calendar_updated != "never")
+
+## recode
+unique(list_filtered$calendar_updated)
+# unique(list_filtered$calendar_updated[order(list_filtered$calendar_updated_numeric)])
+
+list_filtered$calendar_updated_numeric = ifelse(list_filtered$calendar_updated == "today", 0
+                                                ,ifelse(list_filtered$calendar_updated == "yesterday", 1
+                                                        , ifelse(grepl(pattern = " days ago",list_filtered$calendar_updated), as.numeric(gsub(" days ago", "", list_filtered$calendar_updated))
+                                                                 ,ifelse(grepl(pattern = " weeks ago",list_filtered$calendar_updated), as.numeric(gsub(" weeks ago", "", list_filtered$calendar_updated))*7
+                                                                         , ifelse(grepl(pattern = "a week ago",list_filtered$calendar_updated), 7
+                                                                                  , ifelse(grepl(pattern = " week ago",list_filtered$calendar_updated), as.numeric(gsub(" week ago", "", list_filtered$calendar_updated))*7
+                                                                                           , as.numeric(gsub(" months ago", "", list_filtered$calendar_updated))*30)
+                                                                                  )
+                                                                        )        
+                                                              )
+                                                      )
+                                                )
+
+
+```
+
+
+##### Creating new features
+# New Features for Number of Characters in string
+```{r}
+subset_colclasses <- function(DF, colclasses="numeric") {
+  DF[,sapply(DF, function(vec, test) class(vec) %in% test, test=colclasses)]
+}
+# this finds the column names of the character columns in the data set
+names(subset_colclasses(list_filtered, c("character")))
+
+# This loop also can create the the number of characters in character columns
+
+for(i in names(subset_colclasses(list_filtered, c("character")))){
+  list_filtered[[paste(i,'length', sep = "_")]] <- str_length(list_filtered[[i]])
+}
+
+## this might have created some NAs so recoding
+new_string_names = list_filtered %>%
+  select(select_vars(names(list_filtered), ends_with('length', ignore.case = TRUE))) %>%
+  names()
+
+## set any NAs to 0, which would imply these variables had no text/data in the columns
+list_filtered[new_string_names][is.na(list_filtered[new_string_names])] <- 0
+
+## check the last set of variables to ensure they were created
+# unique(data.frame(column_class = unlist(sapply(list_filtered, function(y) class(y)))))
+
+```
+
+
+## Creating New Features For Days Since Variables: host_since, first_review, last_review
+
+```{r}
+# unique(data.frame(column_class = unlist(sapply(list_filtered, function(y) class(y)))))
+## Get the date variables 
+names(subset_colclasses(list_filtered, c("Date"))) ## subset_colcclassess is up top
+# host_since, calendar_last_scraped, first_review, last_review 
+
+# as.numeric(sprintf('%02d', day( 
+#   seconds_to_period(as.duration(interval("2015-01-20 09:50:34", "2015-06-20 16:37:07")))
+#   )))
+
+## 2 NAs in host_since: will remove
+list_filtered = list_filtered %>% 
+  filter(!is.na(host_since))
+
+## new variable called host_since_tenure 
+list_filtered$host_since_tenure = as.numeric(sprintf('%02d', day( 
+  seconds_to_period(as.duration(interval(list_filtered$host_since,list_filtered$calendar_last_scraped)))
+  )))
+
+
+## new variable called: days_since_first_review
+## because there are NA's this would imply these are new listings, so going to assign those values with a value not in the data
+## like -1
+## then will created a dummy variable to indicate whether the listing is a new listing
+
+list_filtered$days_since_first_review = ifelse(is.na(list_filtered$first_review),-1, as.numeric(sprintf('%02d', day( 
+  seconds_to_period(as.duration(interval(list_filtered$first_review,list_filtered$calendar_last_scraped)))
+  ))))
+
+
+## new variable called: days_since_last_review
+## because there are NA's this would imply these are new listings, so going to assign those values with a value not in the data
+## like -1
+## then will created a dummy variable to indicate whether the listing is a new listing
+
+list_filtered$days_since_last_review = ifelse(is.na(list_filtered$last_review),-1, as.numeric(sprintf('%02d', day( 
+  seconds_to_period(as.duration(interval(list_filtered$last_review,list_filtered$calendar_last_scraped)))
+  ))))
+
+## new variable to indicate if listingis new 
+
+list_filtered$is_new_listing = ifelse(is.na(list_filtered$last_review) & is.na(list_filtered$first_review), 1, 0)
+
+
+```
+
+## New Feature: Get a total count of the number of properites listed in the neighborhood where the AIRBNB is located: more properties = more supply
+```{r}
+list_filtered %>% group_by(neighbourhood_cleansed) %>% mutate(count = n())
+names(subset_colclasses(list_filtered, c("character")))
+unique(list_filtered$neighbourhood_cleansed)
+list_filtered = merge(list_filtered, 
+      list_filtered %>% group_by(neighbourhood_cleansed) %>% summarise(num_properties_in_neighborhood = n()) )
+```
+
+## New Feature: Host is local - boolean does the host neighborhood contain Massachusetts
+```{r}
+list_filtered$host_is_local<- ifelse(grepl("Massachusetts", list_filtered$host_location, ignore.case = T), 1,0)
+```
+
+
+### REMOVE THIS CODE!!! Box plot of outliers and remove outliers
+```{r }
+#OUTLIERS: Removes outliers for price 
+list_filtered %>%
+ ggplot(.,aes(x = price)) + geom_histogram(binwidth = 200)
+price_outliers <- boxplot(list_filtered$price)$out #pulls rows of outliers
+list_filtered <- list_filtered[-which(list_filtered$price %in% price_outliers),] #filters out outliers 
+dim(list_filtered)
+
+#OUTLIERS: Removes outliers for reviews 
+# boxplot(list_df_clean$review_scores_rating) #clearly shows outliers
+list_filtered %>%
+ ggplot(.,aes(x = review_scores_rating)) + geom_histogram()
+review_rating_outliers <- boxplot(list_filtered$review_scores_rating)$out #pulls rows of outliers 
+list_filtered <- list_filtered[-which(list_filtered$review_scores_rating %in% review_rating_outliers),] #filters out outliers
+dim(list_filtered)
+```
+
+
+```{r}
+text_decomp <- read.csv("final_text_decomposition.csv",stringsAsFactors = FALSE,header=TRUE) 
+df <- merge(list_filtered,text_decomp,by='listing_id')
+
+#df %>% select(everything()) %>%  # replace to your needs summarise_all(funs(sum(is.na(.))))
+#treatment of dates specifically 
+df$last_review[is.na(df$last_review)] <- as.Date(0,origin="2000-01-01")
+df$first_review[is.na(df$first_review)] <- as.Date(0,origin="2000-01-01")
+df$calendar_last_scraped[is.na(df$calendar_last_scraped)] <- as.Date(0,origin="2000-01-01")
+df$host_since[is.na(df$host_since)] <- as.Date(0,origin="2000-01-01")
+#changes all NAs to 0
+df[is.na(df)] <- 0
+#drops the followings columns: 
+#host_verifications (recoded as T/F dummies)
+#name, summary, space, description, neighborhood_overview, notes, access,interaction, house_rules because textual features have been generated
+#calendar updated because we generated to numeric
+df2 <- subset(df,select = -c(host_location, host_neighbourhood,last_review,first_review,calendar_last_scraped,host_since,host_acceptance_rate,experiences_offered_length,experiences_offered,host_acceptance_rate_length,jurisdiction_names,license,calendar_updated, host_verifications,name, summary, space, description, neighborhood_overview, notes, access,interaction, house_rules,transit)) #removes original variables from which dummies were created
+names(df2)
+#removes / and special characters before dummies are created
+df2$property_type <- gsub("/", "_", df2$property_type)
+df2$room_type <- gsub("/", "_", df2$room_type)
+df2$bed_type <- gsub("-", "_", df2$bed_type)
+#creates one infinite value as 0 
+df2$cc_avg_reviews[is.infinite(df2$cc_avg_reviews)] <- 0
+results <- fastDummies::dummy_cols(df2)
+fit1<- lm(price~.,data=results)
+summary(fit1)
+
+```
+
+```{r}
+# Import cleaned data ---------------------------------------------------------
+library(MASS)
+library (dplyr)
+library(tidyverse)
+library(magrittr)
+library(car)
+library(e1071) 
+library(gridExtra)
+require(MASS)
+require(dplyr)
+select <- dplyr::select
+```
+
+```{r}
+# Additional data cleanup and variable removal --------------------------------
+data <- results 
+# select only numerical columns, remove NA rows
+reg_data <- data %>%select_if(is.numeric) %>%   select (-c(listing_id)) %>% na.omit()
+
+# remove variables with no variation
+no_variation_vars <- names(reg_data)[apply(reg_data, 2, min) - apply(reg_data, 2, max) == 0]
+reg_data <- reg_data %>% 
+  select(-!!no_variation_vars)
+
+# remove variables with high correlation
+corr_matrix <- cor(reg_data)
+corr_index <- which(corr_matrix > 0.90, arr.ind = TRUE) %>% as_tibble()
+corr_index[['variable']] <- which(corr_matrix > 0.90, arr.ind = TRUE) %>% rownames()
+correlated_vars <- corr_index[corr_index$row > corr_index$col, ]$variable
+reg_data <- reg_data %>% 
+  select(-!!correlated_vars)
+
+# remove variables with perfect collinearity
+coll_model <- lm(price ~ ., reg_data)
+coll_vars <- names(coll_model$coefficients[is.na(coll_model$coefficients)])
+reg_data <- reg_data %>% 
+  select(-!!coll_vars)
+
+# remove variables with collinearity
+coll_model <- lm(price ~ ., reg_data)
+vif_scores <- vif(coll_model)
+inflated_vars <- names(vif_scores)[vif_scores > 10]
+reduced_reg_data <- reg_data %>% 
+  select(-!!inflated_vars)
+```
+
+```{r}
+# Examine relationship of remaining variables ---------------------------------
+# extract dummy vs continuous X variables
+values_per_var <- apply(reduced_reg_data, 2, function(x) length(unique(x)))
+dummy_vars <- names(values_per_var)[values_per_var == 2]
+continuous_vars <- names(values_per_var)[values_per_var != 2]
+continuous_vars <- continuous_vars[continuous_vars != "price"]
+
+# examine scatter plot of price vs. continuous X variables [view in markdown]
+reduced_reg_data %>%
+  select(price, !!continuous_vars) %>%
+  gather(variable, value, -price) %>%
+  ggplot(aes(y=price, x=value, group = variable)) +
+  geom_point() + 
+  facet_wrap(. ~ variable, scales='free', ncol = 4)
+```
+
+```{r}
+# Apply transformation of variables -------------------------------------------
+# log-transform Y variable
+trans_data <- reduced_reg_data %>%
+  filter(price > 0) %>%
+  mutate(log_price = log(price)) %>%
+  select(-price)
+
+# examine new distribution of Y variable
+trans_data %>%
+  ggplot(aes(x = log_price)) +
+  geom_histogram()
+
+# log-transform skewed continuous X variables
+continuous_data <- trans_data[continuous_vars]
+skewed_vars <- names(continuous_data)[apply(continuous_data, 2, skewness) > 5]
+for (v in skewed_vars) {
+  trans_data[paste0("log_", v)] = log(trans_data[v] + 1)
+  trans_data <- trans_data %>% select(-!!v)
+}
+
+# sanity check -- examine adj. R^2 before and after transformation
+lm(price ~ ., reduced_reg_data) %>% summary() %>% .$adj.r.squared
+lm(log_price ~ ., trans_data) %>% summary() %>% .$adj.r.squared
+
+####  ADDITIONAL STEP: PERFORM BOXCOX OR BOXTIDWELL FOR POWER TRANSFORMATION
+n=nrow(trans_data)
+trans_dataX <- subset(trans_data, select = -c(log_price))
+is_pos <- colSums(trans_dataX != 0) == n
+trans_names <- names(is_pos[is_pos==TRUE])
+trans_dataX <- trans_dataX[trans_names]
+powerTransform(trans_dataX)
+
+trans_data$t_accommodates <- trans_data$accommodates^-0.06
+trans_data$t_bed_type_length <- trans_data$bed_type_length^0.48
+trans_data$t_host_since_tenure <- trans_data$host_since_tenure^0.73
+trans_data$t_guests_included <- trans_data$guests_included^-2
+trans_data$t_calendar_updated_length <- trans_data$calendar_updated_length^1.15
+
+### powerTransform shows log_minimum_nights^-0.89, log_maximum_nights^2.1, and log_maximum_minimum_nights^-0.97 but not sure if it makes sense to transform variables that have already been transformed. 
+
+trans_data <- subset(trans_data, select = -c(accommodates, bed_type_length, host_since_tenure, guests_included, calendar_updated_length))
+```
+
+```{r}
+# Re-examine relationship of remaining variables ------------------------------
+# extract new dummy vs continuous X variables
+values_per_var <- apply(trans_data, 2, function(x) length(unique(x)))
+dummy_vars <- names(values_per_var)[values_per_var == 2]
+continuous_vars <- names(values_per_var)[values_per_var != 2]
+continuous_vars <- continuous_vars[continuous_vars != "log_price"]
+
+# re-examine scatter plots of price vs. continuous X variables [view in markdown]
+trans_data %>%
+  select(log_price, !!continuous_vars) %>%
+  gather(variable, value, -log_price) %>%
+  ggplot(aes(y=log_price, x=value, group = variable)) +
+  geom_point() + 
+  facet_wrap(. ~ variable, scales='free', ncol = 4)
+```
+
+```{r}
+# Perform full model ----------------------------------------------------------
+# run full model
+#drops 
+other_price <- c("weekly_price","monthly_price")
+trans_data <- select(trans_data, -other_price)
+
+full_model <- lm(log_price ~ ., trans_data)
+full_model %>% summary()
+
+#drops topics data
+trans_data_no_topic <- select(trans_data, -contains("Topic"))
+full_model_no_topic <- lm(log_price ~ ., trans_data_no_topic)
+full_model_no_topic %>% summary()
+
+#anova test!! Confirms that p-value is less than 0.05 and that we can reject the null hypothesis that the coefficients of topics are equal to zero. 
+anova(full_model_no_topic,full_model)
+
+
+# examine diagnostic graphs
+get_diagnostic_graphs <- function(model) {
+  p1 <- tibble(y_hat = fitted(model),
+               studentized_residuals = rstudent(model)) %>%
+    ggplot(aes(y_hat, studentized_residuals)) +
+    geom_point()
+  p2 <- tibble(studentized_residuals = rstudent(model)) %>%
+    ggplot(aes(sample = studentized_residuals)) +
+    stat_qq() +
+    geom_qq_line()
+  p3 <- tibble(studentized_residuals = rstudent(model)) %>%
+    ggplot(aes(x = studentized_residuals)) +
+    geom_histogram(bins = 20)
+  grid.arrange(p1, p2, p3, nrow = 2, ncol=2)
+}
+get_diagnostic_graphs(full_model)
+
+### NOTE: centralized errors, no heteroskedacity, correct shape
+### However, we see long-tails and outliers
+```
+
+```{r}
+# Outlier examination ---------------------------------------------------------
+outlier_data <- trans_data[abs(rstudent(full_model)) > 4, ]
+### !!! ADDITIONAL STEP: DO OUTLIER REMOVAL HERE
+as.numeric(rownames(outlier_data))
+trans_data <- subset(trans_data, select=-c(1129, 1379, 1489, 1491, 1668, 2641, 2711, 4358, 4449, 5105, 5118, 5119))
+```
+
+```{r}
+# Get reduced model -----------------------------------------------------------
+# method 1: backwards via p-value
+backwards_pvalue_model <- function(data) {
+  temp_data <- data
+  largest_pvalue <- 1
+  while (largest_pvalue > 0.05) {
+    coef_table <- lm(log_price ~ ., temp_data) %>% summary() %>% .$coefficients
+    largest_pvalue_index <- which.max(coef_table[, "Pr(>|t|)"])
+    largest_pvalue_var <- names(largest_pvalue_index)
+    largest_pvalue <- coef_table[which.max(coef_table[, "Pr(>|t|)"]), "Pr(>|t|)"]
+    if (largest_pvalue > 0.05) {
+      temp_data <- temp_data %>% select(-!!largest_pvalue_var)
+      cat("Removed", largest_pvalue_var, "\n")
+    }
+  }
+  return(lm(log_price ~ ., temp_data))
+}
+```
+
+
+```{r Interaction Terms}
+# try interaction terms
+trans_interact_data <- trans_data
+trans_interact_data$interact1 <- trans_interact_data$bedrooms * trans_interact_data$beds
+trans_interact_data$interact2 <- trans_interact_data$host_listings_count * trans_interact_data$host_is_superhost
+trans_interact_data$interact3 <- trans_interact_data$host_is_superhost * trans_interact_data$cleaning_fee
+
+#p-value is  0.02131, meaning that the fuller model with interaction terms is better 
+full_model_interact <- lm(log_price ~ ., trans_interact_data)
+anova(full_model,full_model_interact)
+
+#p-value is 0.04006, meaning that the fuller model with interaction terms is better 
+pvalue_reduced_model_interact <- backwards_pvalue_model(trans_interact_data)
+anova(pvalue_reduced_model,pvalue_reduced_model_interact)
+
+aic_reduced_model_interact <- step(full_model_interact, trace=FALSE)
+n = nrow(trans_data)
+bic_reduced_model_interact <- step(full_model_interact, k=log(n), trace=FALSE)
+
+#r-squared
+summary(full_model_interact)$r.squared
+summary(pvalue_reduced_model_interact)$r.squared
+summary(aic_reduced_model_interact)$r.squared
+summary(bic_reduced_model_interact)$r.squared
+
+#count of coefficients in each model
+length(coef(full_model_interact))
+length(coef(pvalue_reduced_model_interact))
+length(coef(aic_reduced_model_interact))
+length(coef(bic_reduced_model_interact))
+
+#model probabilities
+BIC <- c(
+BIC(full_model_interact),
+BIC(pvalue_reduced_model_interact),
+BIC(aic_reduced_model_interact),
+BIC(bic_reduced_model_interact)
+)
+
+eBIC <- exp(-0.5*(BIC-min(BIC))) 
+probs <- eBIC/sum(eBIC) 
+round(probs, 5)
+
+#regression tables
+data.frame(get_regression_table(full_model_interact))
+data.frame(get_regression_table(pvalue_reduced_model_interact))
+data.frame(get_regression_table(aic_reduced_model_interact))
+data.frame(get_regression_table(bic_reduced_model_interact))
+
+#summaries
+summary(full_model_interact)
+summary(pvalue_reduced_model_interact)
+summary(aic_reduced_model_interact)
+summary(bic_reduced_model_interact)
+
+#diagnostic graphs
+get_diagnostic_graphs(full_model_interact)
+get_diagnostic_graphs(pvalue_reduced_model_interact)
+get_diagnostic_graphs(aic_reduced_model_interact)
+get_diagnostic_graphs(bic_reduced_model_interact)
+
+#extracts formula!!!
+as.formula(
+    paste0("log_price ~ ", round(coefficients(bic_reduced_model_interact)[1],2), "", 
+           paste(sprintf(" %+.8f*%s ", 
+                         coefficients(bic_reduced_model_interact)[-1],  
+                         names(coefficients(bic_reduced_model_interact)[-1])), 
+                 collapse="")
+    )
+)
+```
+
+
+```{r no interaction terms- pvalue reduced model}
+
+pvalue_reduced_model <- backwards_pvalue_model(trans_data)
+pvalue_reduced_model %>% summary()
+
+#p-value is 0.1617, telling us we cannot reject the null hypothesis that the additional coefficients are equal to zero. This means that we stick with the reduced model.  
+anova(pvalue_reduced_model,full_model)
+get_diagnostic_graphs(pvalue_reduced_model)
+```
+
+```{r}
+# method 2: stepwise via AIC - no interaction terms
+#set.seed(123)
+#random_sample <- sample_n(trans_data, 1500)
+#random_sample_model <- lm(log_price ~ ., random_sample)
+#p-value is 0.98058, telling us we cannot reject the null hypothesis that the additional coefficients are equal to zero. This means that we stick with the aic_reduced_model. 
+aic_reduced_model <- step(full_model, trace=FALSE)
+anova(full_model,aic_reduced_model)
+aic_reduced_model %>% summary()
+get_diagnostic_graphs(aic_reduced_model)
+```
+
+```{r}
+# method 3: stepwise via BIC
+n = nrow(trans_data)
+bic_reduced_model <- step(full_model, k=log(n), trace=FALSE)
+bic_reduced_model %>% summary()
+get_diagnostic_graphs(bic_reduced_model)
+
+```
+
+```{r}
+#assessment of models (no interaction terms)
+BIC <- c(
+BIC(pvalue_reduced_model),
+BIC(aic_reduced_model),
+BIC(bic_reduced_model),
+BIC(full_model)
+)
+
+eBIC <- exp(-0.5*(BIC-min(BIC))) 
+probs <- eBIC/sum(eBIC) 
+round(probs, 5)
+
+#r-squared
+summary(full_model)$r.squared
+summary(pvalue_reduced_model)$r.squared
+summary(aic_reduced_model)$r.squared
+summary(bic_reduced_model)$r.squared
+
+#count of coefficients in each model
+length(coef(full_model))
+length(coef(pvalue_reduced_model))
+length(coef(aic_reduced_model))
+length(coef(bic_reduced_model))
+```
+
+
+
