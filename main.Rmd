@@ -748,8 +748,6 @@ as.formula(
 ```
 
 
-
-
 ```{r AIC no interaction terms}
 # method 2: stepwise via AIC - no interaction terms
 #set.seed(123)
