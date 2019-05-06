@@ -1,6 +1,6 @@
 ---
 title: "Stat 109 Final Project"
-author: "Joanna Guo/Austin Nguyen/Jeremiah Rodriguez/Tiffany Huang"
+author: "Joanna Guo/Austin Nguyen/Jeremiah Rodriguez/Lily Huang"
 date: "5/6/2019"
 output: pdf_document
 ---
@@ -364,7 +364,7 @@ list_filtered$host_is_local<- ifelse(grepl("Massachusetts", list_filtered$host_l
 ```
 
 
-### REMOVE THIS CODE!!! Box plot of outliers and remove outliers
+### Box plot of outliers and remove outliers
 ```{r }
 #OUTLIERS: Removes outliers for price 
 list_filtered %>%
@@ -459,7 +459,7 @@ data <- results
 # select only numerical columns, remove NA rows
 reg_data <- data %>%select_if(is.numeric) %>%   select (-c(listing_id)) %>% na.omit()
 
-# remove variables with no variation
+# remove variables with no variation: is_business_travel_ready, has_availability, requires_license
 no_variation_vars <- names(reg_data)[apply(reg_data, 2, min) - apply(reg_data, 2, max) == 0]
 reg_data <- reg_data %>% 
   select(-!!no_variation_vars)
@@ -475,15 +475,35 @@ reg_data <- reg_data %>%
 # remove variables with perfect collinearity
 coll_model <- lm(price ~ ., reg_data)
 coll_vars <- names(coll_model$coefficients[is.na(coll_model$coefficients)])
+#vars with perfect collinearity: days_since_last_review", "neighbourhood_cleansed_Hyde_Park"        "neighbourhood_cleansed_Leather_District", "host_response_time_a_few_days_or_more", "property_type_Camper_RV"    , "room_type_Shared_room", "bed_type_Airbed"                         "cancellation_policy_strict"             
 reg_data <- reg_data %>% 
   select(-!!coll_vars)
 
 # remove variables with collinearity
-coll_model <- lm(price ~ ., reg_data)
+drop_VIF <- function(data) {
+  temp_data <- data
+  largest_VIF <- 20
+  while (largest_VIF > 10) {
+    coll_model <- lm(price ~ ., temp_data)
+    vif_scores <- vif(coll_model)
+    inflated_var <- names(vif_scores[vif_scores == max(vif_scores)])
+    largest_VIF <- max(vif_scores)
+    if (largest_VIF > 10) {
+      temp_data <- temp_data %>% select(-!!inflated_var)
+      cat("Removed", inflated_var, "\n")
+    }
+  }
+  return(temp_data)
+}
+
+reduced_reg_data <- drop_VIF(reg_data)
+coll_model <- lm(price ~ ., reduced_reg_data)
 vif_scores <- vif(coll_model)
-inflated_vars <- names(vif_scores)[vif_scores > 10]
-reduced_reg_data <- reg_data %>% 
-  select(-!!inflated_vars)
+#confirms no more VIF scores greater than 10
+(inflated_vars <- names(vif_scores)[vif_scores > 10]) 
+sort(vif(coll_model),decreasing=TRUE)
+
+#reduced_reg_data <- reg_data %>% select(-!!inflated_vars)
 ```
 
 ```{r}
@@ -537,13 +557,14 @@ trans_dataX <- trans_dataX[trans_names]
 
 powerTransform(trans_dataX)
 
-trans_data$t_accommodates <- trans_data$accommodates^(-0.04844065)
+trans_data$t_accommodates <- trans_data$accommodates^(-0.04732766)
 trans_data$t_host_since_tenure <- trans_data$host_since_tenure^(0.72619421)
-trans_data$t_guests_included <- trans_data$guests_included^(-1.99328162)
+trans_data$t_guests_included <- trans_data$guests_included^(-1.99488233 )
+trans_data$t_num_properties_in_neighborhood <- trans_data$num_properties_in_neighborhood^(1.33977856)
 
 ### powerTransform shows log_minimum_nights^-0.89, log_maximum_nights^2.1, and log_maximum_minimum_nights^-0.97 but not sure if it makes sense to transform variables that have already been transformed. 
 
-trans_data <- subset(trans_data, select = -c(accommodates,host_since_tenure, guests_included))
+trans_data <- subset(trans_data, select = -c(accommodates,host_since_tenure, guests_included,num_properties_in_neighborhood))
 
 #also drops reudndant price features while we're at it
 other_price <- c("weekly_price","monthly_price")
@@ -619,7 +640,6 @@ ncvTest(full_model)
 box_log_price <- caret::BoxCoxTrans(trans_data$log_price)
 
 hello <- cbind(trans_data, box_price=predict(box_log_price, trans_data$log_price)) # append the transformed variable to cars
-
 full_box_model <- lm(box_price ~ ., hello)
 ncvTest(full_box_model)
 head(cars) # view the top 6 rows
@@ -648,11 +668,9 @@ backwards_pvalue_model <- function(data) {
 ```
 
 ```{r no interaction terms- pvalue reduced model}
-
 pvalue_reduced_model <- backwards_pvalue_model(trans_data)
 pvalue_reduced_model %>% summary()
-
-#p-value is 0.07961, telling us we cannot reject the null hypothesis that the additional coefficients are equal to zero. This means that we stick with the reduced model.  
+#p-value is 0.3632, telling us we cannot reject the null hypothesis that the additional coefficients are equal to zero. This means that we stick with the reduced model.  
 anova(pvalue_reduced_model,full_model)
 get_diagnostic_graphs(pvalue_reduced_model)
 ```
@@ -664,11 +682,11 @@ trans_interact_data$interact1 <- trans_interact_data$bedrooms * trans_interact_d
 trans_interact_data$interact2 <- trans_interact_data$host_listings_count * trans_interact_data$host_is_superhost
 trans_interact_data$interact3 <- trans_interact_data$host_is_superhost * trans_interact_data$cleaning_fee
 
-#p-value is  0.03666, meaning that the fuller model with interaction terms is better 
+#p-value is  0.002696, meaning that the fuller model with interaction terms is better 
 full_model_interact <- lm(log_price ~ ., trans_interact_data)
 anova(full_model,full_model_interact)
 
-#p-value is 0.003404, meaning that the fuller model with interaction terms is better 
+#p-value is 0.002293, meaning that the fuller model with interaction terms is better 
 pvalue_reduced_model_interact <- backwards_pvalue_model(trans_interact_data)
 anova(pvalue_reduced_model,pvalue_reduced_model_interact)
 
