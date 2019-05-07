@@ -1,6 +1,6 @@
 ---
 title: "Stat 109 Final Project"
-author: "Joanna Guo/Austin Nguyen/Jeremiah Rodriguez/Lily Huang"
+author: "Joanna Guo /  Austin Nguyen/ Jeremiah Rodriguez / Lily Huang"
 date: "5/6/2019"
 output: pdf_document
 ---
@@ -745,6 +745,12 @@ as.formula(
                  collapse="")
     )
 )
+
+#regression_table 
+data.frame(get_regression_table(full_model_interact,digits=10))
+data.frame(get_regression_table(pvalue_reduced_model_interact,digits=10))
+data.frame(get_regression_table(aic_reduced_model_interact,digits=10))
+data.frame(get_regression_table(bic_reduced_model_interact,digits=10))
 ```
 
 
@@ -793,4 +799,14 @@ length(coef(full_model))
 length(coef(pvalue_reduced_model))
 length(coef(aic_reduced_model))
 length(coef(bic_reduced_model))
+```
+
+```{r}
+output <- data.frame(get_regression_table(bic_reduced_model_interact,digits=10))
+estimates <- output[,1:2]
+back_transform_func <- function(coefficient) {
+  coefficient_backtransformed <- (e^(coefficient)-1) * 100 
+  return(coefficient_backtransformed)
+}
+estimates$transformed_estimates <- back_transform( estimates$estimate)
 ```
