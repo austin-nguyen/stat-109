@@ -1,7 +1,7 @@
 ---
 title: "Stat 109 Final Project"
-author: "Joanna Guo/Austin Nguyen/Jeremiah Rodriguez/Tiffany Huang"
-date: "5/4/2019"
+author: "Joanna Guo /  Austin Nguyen/ Jeremiah Rodriguez / Lily Huang"
+date: "5/6/2019"
 output: pdf_document
 ---
 
@@ -45,8 +45,8 @@ library(lubridate) #needed to handle dates easily
 library(car) #needed to recode values easily
 
 #loads dataset
-#cal_detail <- read.csv("calendar_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
-#list_detail <- read.csv("listings_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
+cal_detail <- read.csv("calendar_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
+list_detail <- read.csv("listings_detailed_boston.csv",stringsAsFactors = FALSE,header=TRUE) 
 
 #renames id to listing_id so there is a unique_key on which datasets can be merged
 #  names(list_detail)[names(list_detail) == "id"] <- "listing_id"
@@ -302,38 +302,7 @@ list_filtered$calendar_updated_numeric = ifelse(list_filtered$calendar_updated =
 
 ```
 
-
-##### Creating new features
-# New Features for Number of Characters in string
-```{r}
-subset_colclasses <- function(DF, colclasses="numeric") {
-  DF[,sapply(DF, function(vec, test) class(vec) %in% test, test=colclasses)]
-}
-# this finds the column names of the character columns in the data set
-names(subset_colclasses(list_filtered, c("character")))
-
-# This loop also can create the the number of characters in character columns
-
-for(i in names(subset_colclasses(list_filtered, c("character")))){
-  list_filtered[[paste(i,'length', sep = "_")]] <- str_length(list_filtered[[i]])
-}
-
-## this might have created some NAs so recoding
-new_string_names = list_filtered %>%
-  select(select_vars(names(list_filtered), ends_with('length', ignore.case = TRUE))) %>%
-  names()
-
-## set any NAs to 0, which would imply these variables had no text/data in the columns
-list_filtered[new_string_names][is.na(list_filtered[new_string_names])] <- 0
-
-## check the last set of variables to ensure they were created
-# unique(data.frame(column_class = unlist(sapply(list_filtered, function(y) class(y)))))
-
-```
-
-
 ## Creating New Features For Days Since Variables: host_since, first_review, last_review
-
 ```{r}
 # unique(data.frame(column_class = unlist(sapply(list_filtered, function(y) class(y)))))
 ## Get the date variables 
@@ -395,7 +364,7 @@ list_filtered$host_is_local<- ifelse(grepl("Massachusetts", list_filtered$host_l
 ```
 
 
-### REMOVE THIS CODE!!! Box plot of outliers and remove outliers
+### Box plot of outliers and remove outliers
 ```{r }
 #OUTLIERS: Removes outliers for price 
 list_filtered %>%
@@ -430,7 +399,33 @@ df[is.na(df)] <- 0
 #host_verifications (recoded as T/F dummies)
 #name, summary, space, description, neighborhood_overview, notes, access,interaction, house_rules because textual features have been generated
 #calendar updated because we generated to numeric
-df2 <- subset(df,select = -c(host_location, host_neighbourhood,last_review,first_review,calendar_last_scraped,host_since,host_acceptance_rate,experiences_offered_length,experiences_offered,host_acceptance_rate_length,jurisdiction_names,license,calendar_updated, host_verifications,name, summary, space, description, neighborhood_overview, notes, access,interaction, house_rules,transit)) #removes original variables from which dummies were created
+df2 <- subset(df,select = -c(
+  host_location, 
+  host_neighbourhood,
+  last_review,
+  first_review,
+  calendar_last_scraped,
+  calendar_updated,
+  host_since,
+  host_acceptance_rate,
+  experiences_offered,
+  jurisdiction_names,
+  license,calendar_updated, 
+  host_verifications,
+  name, 
+  summary, 
+  space, 
+  description, 
+  neighborhood_overview, 
+  notes, 
+  access,interaction, 
+  house_rules,
+  transit
+  
+  )) #removes original variables from which dummies were created
+
+#length_vars <- c( host_response_time_length, host_neighbourhood_length, neighbourhood_cleansed_length, property_type_length, room_type_length, calendar_updated_length, license_length, jurisdiction_names_length, cancellation_policy_length, host_acceptance_rate_length, experiences_offered_length)
+
 names(df2)
 #removes / and special characters before dummies are created
 df2$property_type <- gsub("/", "_", df2$property_type)
